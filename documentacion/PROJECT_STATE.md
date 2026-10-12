@@ -58,10 +58,10 @@ con resultado verdadero.
 1. **Catálogo** (`pages/tienda.html`): productos desde `GET /api/productos` (API REST PHP del e-commerce).
 2. **Carrito** (`scripts/carrito.js`): persistencia en `sessionStorage`, drawer responsive con cantidades y totales informativos.
 3. **Checkout** (`scripts/tienda.js`): formulario guest, `POST /api/pedidos` → Pedido en `PEND_VERIF`, con correcciones comerciales reintentables.
-4. **Mensaje bloqueante de pedido creado:** modal con el email del comprador (insertado con `textContent`), único control [OK] y foco retenido; la creación queda marcada en `sessionStorage` (aislamiento por pestaña: ninguna otra pestaña ve la marca ni pierde su carrito).
+4. **Mensaje bloqueante de pedido creado:** modal con el email del comprador (insertado con `textContent`), [OK] y foco retenido; si `email_enviado === false`, informa el fallo y ofrece reenviar el email del mismo Pedido. La creación queda marcada en `sessionStorage` (aislamiento por pestaña: ninguna otra pestaña ve la marca ni pierde su carrito).
 5. **Verificación de email:** enlace hacia `pages/resultado.html?flow=checkout&token=...` → `POST /api/email-verificaciones/validar` → **Continuar compra** hacia `pages/tienda.html?token=...`.
 6. **Recuperación del Pedido:** `POST /api/email-verificaciones/pedidos`; sólo continúa el Pedido en `PEND_PAGO`, que reemplaza (nunca fusiona) el carrito local. El token vive sólo en memoria; `BroadcastChannel` no se usa.
-7. **Pago simulado:** `POST /api/pedidos/{id}/pago` con simulación `APROBADO` (sin cobros reales); si los items del carrito difieren del snapshot del Pedido, primero `POST /api/email-verificaciones/pedidos/reemplazo`.
+7. **Pago simulado:** `POST /api/pedidos/{id}/pago` con el token de verificación y simulación `APROBADO` (sin cobros reales); si los items del carrito difieren del snapshot del Pedido, primero `POST /api/email-verificaciones/pedidos/reemplazo`.
 8. **Resultados:** `PAGADO` ⇒ confirmación y vaciado del carrito; `PAGADO_STOCK_NO_AFECTADO` ⇒ mensaje de revisión con el carrito conservado; `rechazado` y `correccion` ⇒ reintento dentro del mismo drawer; errores identificables vuelven al modo normal de la tienda.
 
 ## Validaciones disponibles
@@ -72,7 +72,7 @@ con resultado verdadero.
 
 ## Limitaciones conocidas
 
-- Sin reenvío de verificación de email ni cooldown.
+- Reenvío de verificación implementado: ante `email_enviado === false` el modal permite llamar a `POST /api/email-verificaciones/reenvio`; el frontend informa el cooldown y los errores del endpoint sin crear otro Pedido ni modificar el carrito.
 - Sin cancelación de Pedido ni estado `EN_PROCESO`.
 - Pago simulado (proveedor `DUMMY`, sólo `APROBADO`/`RECHAZADO`): el MVP académico no realiza cobros.
 - Token de verificación sólo en memoria: la única puerta de entrada es `?token=` en la URL.
@@ -94,7 +94,7 @@ con resultado verdadero.
 | Cierre funcional local del MVP | **COMPLETADO** — flujo completo, 88/88 automatizado, validación manual del pago aprobado, sin defectos bloqueantes conocidos |
 | Despliegue a PROD del e-commerce | **NO REALIZADO** — `master` continúa en v1.2.1; no habrá ventas ni cobros reales |
 | Último deploy del sitio | GitHub Pages `c4e7d20`, 2026-08-08, estado `success` (anterior a la etapa v1.3) |
-| Pendientes posteriores (no requisitos de cierre) | reenvío de verificación, cancelación de Pedido, estado `EN_PROCESO`, README académico |
+| Pendientes posteriores (no requisitos de cierre) | cancelación de Pedido, estado `EN_PROCESO`, README académico |
 
 ---
 
@@ -221,7 +221,7 @@ v1.2.1 constituye el último checkpoint funcional confirmado **en producción**;
 
 ESTADO: **MVP LOCAL COMPLETADO EN `dev` (SIN DESPLIEGUE)**
 
-Etapa desarrollada en la rama `dev`. El MVP local incluye catálogo, carrito, checkout con verificación de email, mensaje bloqueante de pedido creado, recuperación del Pedido, pago simulado y confirmación (ver sección MVP LOCAL DE v1.3). El backend del e-commerce vive en un repositorio separado (PHP + MariaDB). Pendientes posteriores: reenvío de verificación, cancelación de Pedido y estado `EN_PROCESO`.
+Etapa desarrollada en la rama `dev`. El MVP local incluye catálogo, carrito, checkout con verificación de email, mensaje bloqueante de pedido creado, recuperación del Pedido, pago simulado y confirmación (ver sección MVP LOCAL DE v1.3). El backend del e-commerce vive en un repositorio separado (PHP + MariaDB). El reenvío de verificación y su cooldown están implementados; los pendientes posteriores son la cancelación de Pedido y el estado `EN_PROCESO`.
 
 ---
 
@@ -243,7 +243,7 @@ No existen tareas funcionales pendientes correspondientes a v1.0, v1.1, v1.2 o v
 
 v1.3 se desarrolla en la rama `dev` como parte de un trabajo académico sobre e-commerce.
 
-Al 10/10/2026 el **MVP local está completado y validado** (ver sección MVP LOCAL DE v1.3): quedan como pendientes posteriores el reenvío de verificación, la cancelación de Pedido y el estado `EN_PROCESO`, y como etapa posterior cualquier decisión de despliegue.
+Al 10/10/2026 el **MVP local está completado y validado** (ver sección MVP LOCAL DE v1.3). El reenvío de verificación y su cooldown se incorporaron posteriormente al cierre local; quedan como pendientes posteriores la cancelación de Pedido y el estado `EN_PROCESO`, y como etapa posterior cualquier decisión de despliegue.
 
 El alcance definitivo se determinará a partir de los requisitos de dicho trabajo.
 
@@ -267,7 +267,7 @@ Estas tareas todavía no deben considerarse realizadas.
 
 ESTADO: **MVP LOCAL COMPLETADO EN `dev` — ETAPA ABIERTA**
 
-Etapa desarrollada como proyecto académico. El MVP local está completado y validado (suite automatizada 88/88 PASS y validación manual del flujo con pago aprobado; ver sección MVP LOCAL DE v1.3). Quedan pendientes posteriores (reenvío de verificación, cancelación de Pedido, estado `EN_PROCESO`) y la definición de despliegue, fuera del alcance actual (ver `documentacion/ROADMAP.md`).
+Etapa desarrollada como proyecto académico. El MVP local está completado y validado (suite automatizada 88/88 PASS y validación manual del flujo con pago aprobado; ver sección MVP LOCAL DE v1.3). El reenvío de verificación y su cooldown están implementados; quedan pendientes posteriores la cancelación de Pedido, el estado `EN_PROCESO` y la definición de despliegue, fuera del alcance actual (ver `documentacion/ROADMAP.md`).
 
 El e-commerce no se desplegará a PROD por ahora: no habrá ventas ni cobros reales.
 

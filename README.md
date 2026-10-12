@@ -213,30 +213,26 @@ El backend se versiona y administra de forma independiente del repositorio públ
 
 # Documentación
 
-La documentación pública disponible incluye:
+La documentación disponible en este repositorio incluye:
 
-- `CHANGELOG.md`
-- `SCALING_ROADMAP.md`
+- `documentacion/CHANGELOG.md`
+- `documentacion/ROADMAP.md`
+- `documentacion/PROJECT_STATE.md`
+- `documentacion/SCALING_ROADMAP.md`
 
-La documentación interna y operativa no forma parte del repositorio público.
+La documentación interna del backend y las configuraciones específicas de entorno se administran por separado.
 
-Entre la documentación mantenida de forma privada se encuentran:
-
-- Estado detallado del proyecto.
-- Documentación interna del backend.
-- Procedimientos de backup y recuperación.
-- Configuraciones específicas de entorno.
-- Información operativa y de infraestructura.
+El README definitivo para los requisitos académicos se completará después del despliegue correspondiente; este documento no adelanta ese cierre.
 
 ---
 
 # Estado del proyecto
 
-## Versión 1.0
+## Versiones cerradas
 
-La versión 1.0 fue completada y publicada.
+Las versiones v1.0, v1.1, v1.2 y v1.2.1 están cerradas. La versión publicada en `master` es **v1.2.1**.
 
-Incluye:
+Entre sus funcionalidades se incluyen:
 
 - Sitio web oficial.
 - Frontend responsive.
@@ -256,15 +252,18 @@ Incluye:
 - Google Analytics 4.
 - Separación DEV / PROD.
 
-## Versión 1.1
+## Versión 1.3 — E-commerce académico
 
-Actualmente en desarrollo.
+El MVP local del e-commerce está completado en la rama `dev`, sin despliegue a producción ni ventas o cobros reales.
 
-Objetivos principales:
+Incluye:
 
-- Galerías fotográficas de shows históricos.
-- Mejoras de contenido.
-- Mejoras de experiencia de usuario.
+- Catálogo, carrito y checkout guest.
+- Verificación de email y recuperación del Pedido por token.
+- Reenvío de verificación y manejo de cooldown cuando falla el envío inicial.
+- Pago simulado y confirmación dentro del drawer del carrito.
+
+Pendientes posteriores: cancelación de Pedido, estado `EN_PROCESO` y cualquier decisión de despliegue. El detalle vigente está en `documentacion/PROJECT_STATE.md` y `documentacion/ROADMAP.md`.
 
 ---
 
@@ -281,8 +280,10 @@ El proyecto mantiene un roadmap de evolución basado en:
 
 Para conocer el estado y evolución del proyecto:
 
-- `CHANGELOG.md`
-- `SCALING_ROADMAP.md`
+- `documentacion/CHANGELOG.md`
+- `documentacion/ROADMAP.md`
+- `documentacion/PROJECT_STATE.md`
+- `documentacion/SCALING_ROADMAP.md`
 
 ---
 
@@ -322,10 +323,12 @@ Las migraciones se realizarán únicamente cuando el volumen, rendimiento o nece
 | Diseño | Responsive / Mobile-first |
 | Hosting | GitHub Pages |
 | DNS / CDN | Cloudflare |
-| Backend | Google Apps Script |
-| API | Google Apps Script Web App |
-| Persistencia | Google Sheets |
-| Email | Google Apps Script |
+| Backend del sitio | Google Apps Script |
+| API del sitio | Google Apps Script Web App |
+| Persistencia del sitio | Google Sheets |
+| Email del sitio | Google Apps Script |
+| E-commerce MVP local (`dev`) | PHP + MariaDB, API REST separada |
+| Email del e-commerce | Resend |
 | Analytics | Google Analytics 4 |
 | Control de versiones | Git |
 
@@ -335,11 +338,11 @@ Las migraciones se realizarán únicamente cuando el volumen, rendimiento o nece
 
 **Proyecto activo**
 
-**Versión actual: 1.1**
+**Producción: v1.2.1 (`master`)**
 
-La versión 1.0 se encuentra cerrada y publicada.
+**Desarrollo: MVP local v1.3 de e-commerce (`dev`, sin despliegue)**
 
-El desarrollo continúa con mejoras progresivas del frontend, contenido y experiencia de usuario.
+El desarrollo continúa con mejoras progresivas y con los pendientes documentados de v1.3. El cierre académico R9 y la versión definitiva del README quedan para una etapa posterior al despliegue.
 
 ---
 

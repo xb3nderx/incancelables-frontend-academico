@@ -4,6 +4,8 @@
 
 **Última actualización:** 2026-07-27
 
+> **Alcance histórico:** este documento describe la arquitectura del sitio y la comunidad vigente en julio de 2026 (Google Apps Script, Google Sheets y Apps Script Mail). No describe el MVP local de e-commerce v1.3, incorporado después como backend separado en PHP + MariaDB con Resend; ver `PROJECT_STATE.md` y `ROADMAP.md`.
+
 # 1. Arquitectura actual
 
 USUARIO

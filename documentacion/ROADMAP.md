@@ -18,7 +18,7 @@ Esta etapa surge a partir de un trabajo académico sobre e-commerce y se utiliza
 
 * **Diseño técnico y funcional:** definido.
 * **Backend MVP (PHP + MariaDB):** implementado.
-* **Frontend del e-commerce:** MVP local completado en la rama `dev` (HEAD `75ca293`, 2026-10-09): catálogo, Bloques 2 a 6 y finalización del checkout (mensaje bloqueante de pedido creado + aislamiento por pestaña con `sessionStorage`). Validación: suite automatizada 88/88 PASS y recorrido manual del flujo con pago aprobado. Pendientes posteriores (no son requisito de cierre): reenvío de verificación, cancelación de Pedido y estado `EN_PROCESO`. Sin despliegue a PROD.
+* **Frontend del e-commerce:** MVP local completado en la rama `dev` (HEAD `75ca293`, 2026-10-09): catálogo, Bloques 2 a 6 y finalización del checkout (mensaje bloqueante de pedido creado + aislamiento por pestaña con `sessionStorage`). El reenvío de verificación y su cooldown están implementados posteriormente al cierre local. Pendientes posteriores (no son requisito de cierre): cancelación de Pedido y estado `EN_PROCESO`. Sin despliegue a PROD.
 * **Entorno académico:** no habrá ventas ni cobros reales.
 
 #### Arquitectura y alcance
@@ -69,7 +69,7 @@ La incorporación de una API en PHP y una base de datos puede producir modificac
 **PROD (master):** v1.2.1 — no incorpora el e-commerce académico
 **Etapa en curso:** v1.3 — E-commerce e infraestructura (rama `dev`)
 **MVP local de v1.3:** completado en `dev` al 2026-10-10 (flujo completo de compra validado: 88/88 automatizado y validación manual del pago aprobado)
-**Próximo trabajo:** cierre documental (en curso) y, como pendientes posteriores del flujo de compra, reenvío de verificación, cancelación de Pedido y estado `EN_PROCESO`; el despliegue del e-commerce no está realizado ni previsto por ahora
+**Próximo trabajo:** cierre documental (en curso) y, como pendientes posteriores del flujo de compra, cancelación de Pedido y estado `EN_PROCESO`; el despliegue del e-commerce no está realizado ni previsto por ahora
 **Auditoría técnica integral:** postergada a v1.5
 **v2.x:** evolución futura de la plataforma, a definir posteriormente.
 
@@ -441,7 +441,7 @@ Algunas fallas iniciales fueron identificadas como artefactos del entorno de pru
 
 ## Fuera del cierre local — pendientes posteriores (no requisitos de cierre)
 
-- [ ] Reenvío de verificación y cooldown
+- [x] Reenvío de verificación y manejo de cooldown
 - [ ] Cancelación de Pedido y estado `EN_PROCESO`
 - [ ] Despliegue del e-commerce a PROD (no realizado; fuera del alcance actual)
 
@@ -519,13 +519,13 @@ Cubre el **inicio** del checkout: formulario guest, integración con `POST /api/
 - [x] Foco dirigido al mensaje de estado en cada respuesta (enviando, éxito, corrección y error)
 - [x] Formulario y detalle de motivos verificados en mobile y desktop, sin overflow horizontal y con scroll del panel operativo
 
-### Fuera de este bloque
+### Fuera de este bloque (alcance histórico; estado posterior indicado)
 
-- [ ] Validación del token/email
-- [ ] Reenvío de verificación
-- [ ] Pago
+- [x] Validación del token/email (implementada después en el Bloque 4)
+- [x] Reenvío de verificación y cooldown (implementados después del cierre local)
+- [x] Pago (implementado después en el Bloque 5)
 - [ ] Cancelación de Pedido
-- [ ] Finalización completa del flujo de compra
+- [x] Finalización completa del flujo de compra (cerrada posteriormente)
 
 ### Validación
 
@@ -550,15 +550,15 @@ Cubre el **inicio** del checkout: formulario guest, integración con `POST /api/
 - [x] **Bloque 6 — Continuación de la compra en el drawer** (commiteado en `ea3188b`, corrección `84978de`; retira la sección provisional `#compra`, ver sección propia)
 - [x] Flujo de compra (verificación → pago → confirmación): cerrado en los Bloques 5 y 6
 - [x] Finalización del checkout: mensaje bloqueante de pedido creado y aislamiento por pestaña (`75ca293`)
-- [ ] Pendientes posteriores del flujo de compra: reenvío de verificación, cancelación de Pedido y estado `EN_PROCESO`
+- [ ] Pendientes posteriores del flujo de compra: cancelación de Pedido y estado `EN_PROCESO`
 
 ## Bloque 4 — Verificación de email frontend
 
-**Estado: IMPLEMENTADO en `636ff06` (validación del token); reenvío y cooldown todavía pendientes**
+**Estado: validación del token implementada en `636ff06`; reenvío y cooldown implementados posteriormente en el cierre local**
 
 Continuación directa del flujo iniciado en el Bloque 3: el Pedido queda en `PEND_VERIF` hasta que el email sea verificado, y sólo al pasar a `PEND_PAGO` puede iniciarse el pago.
 
-**Punto previo a la implementación:** en DEV el email real **no se envía** (sin MTA: el enlace de verificación queda registrado en el `error_log` de Apache y el reenvío responde `502 error_envio_email`). El canal de prueba debe definirse **antes** de implementar y probar este bloque.
+> **Contexto histórico previo a la implementación:** en DEV el email real no se enviaba (sin MTA: el enlace de verificación quedaba registrado en el `error_log` de Apache y el reenvío respondía `502 error_envio_email`). Ese escenario no describe el canal vigente ni el estado actual del reenvío.
 
 ### Alcance
 
@@ -566,8 +566,8 @@ Continuación directa del flujo iniciado en el Bloque 3: el Pedido queda en `PEN
 - [x] Continuación del flujo tras verificar: `pages/resultado.html` ofrece **Continuar compra** hacia `tienda.html?token=...`
 - [x] `POST /api/email-verificaciones/validar` (`validarTokenCheckout()` en `scripts/api/tiendaClient.js`, `636ff06`)
 - [x] Estados del token: confirmado, inválido y expirado
-- [ ] Reenvío mediante `POST /api/email-verificaciones/reenvio`
-- [ ] Cooldown y respuestas correspondientes
+- [x] Reenvío mediante `POST /api/email-verificaciones/reenvio` cuando `email_enviado === false`, sobre el mismo Pedido
+- [x] Cooldown y respuestas correspondientes informados en el modal de reenvío
 
 > Decisión de UI tomada después del alcance original: la verificación se informa en `pages/resultado.html` y la continuidad de la compra vive en el drawer del carrito de `pages/tienda.html`.
 
@@ -588,7 +588,7 @@ Sin cambios en el backend ni en `scripts/api/apiConfig.js`. No se despliega a PR
 ### Alcance implementado
 
 - [x] `obtenerPedidosVerificados(token)` en `tiendaClient.js`: `POST /api/email-verificaciones/pedidos` con `{token}` (endpoint de sólo lectura), envelope `{ok, message, data, codigo}`; `token_invalido`, `token_expirado` y `verificacion_pendiente` quedan identificados en `codigo` y sin token no se arma la ruta.
-- [x] `iniciarPago(pedidoId, items, simulacion)` en `tiendaClient.js`: `POST /api/pedidos/{id}/pago` con `{accion: "iniciar_pago", proveedor_id: "DUMMY", items, simulacion}`, timeout con `AbortSignal.timeout` y envelope `{ok, message, data, codigo}`.
+- [x] `iniciarPago(pedidoId, token, items, simulacion)` en `tiendaClient.js`: `POST /api/pedidos/{id}/pago` con `{token, accion: "iniciar_pago", proveedor_id: "DUMMY", items, simulacion}`, timeout con `AbortSignal.timeout` y envelope `{ok, message, data, codigo}`. El token es el recibido por email y permanece sólo en memoria.
 - [x] `resultado.js` vuelve a script clásico: sólo informa la verificación y agrega el enlace **Continuar compra** a `tienda.html?token=...`. No recupera items, no ejecuta el pago y no muestra UI de pago/reintento/corrección; el token se propaga tal cual llegó en la URL y no se persiste en `localStorage`/`sessionStorage`.
 - [x] `pages/tienda.html` + `styles/tienda.css`: sección hermana `#compra` con estado anunciable (`role="status"`, `aria-live`, foco), resumen en tabla (Producto / Cantidad / Precio unitario / Subtotal), total y botón **Pagar**; oculta por defecto y visible sólo cuando la URL trae `?token=`.
 - [x] `tienda.js` recupera el Pedido con `obtenerPedidosVerificados(token)` (token sólo en memoria) y paga con `pedidoContinuar = {id, estado, items[]}`: **el carrito de `sessionStorage` no se lee para continuar la compra** (sólo se vacía, como hasta ahora, cuando el Pedido queda `PAGADO`).
@@ -648,7 +648,6 @@ Sin cambios en el backend (cerrado en `1f3d37a`) ni en `scripts/api/apiConfig.js
 
 ### Fuera de este bloque
 
-- Reenvío de verificación y cooldown.
 - Cancelación de Pedido y estado `EN_PROCESO`.
 - Backend y despliegue a PROD.
 
@@ -744,7 +743,7 @@ Desacoplar la verificación de email del sistema Newsletter para reutilizarla en
 
 ## Versión funcional actual
 
-- **DEV (rama `dev`):** v1.2.1 + v1.3 — MVP local del e-commerce completado (HEAD `75ca293`), con 5 archivos JavaScript modificados sin commit, exclusivamente de comentarios, y los 3 documentos de cierre (CHANGELOG, ROADMAP y PROJECT_STATE) actualizados el 10/10/2026 sin commit
+- **DEV (rama `dev`):** v1.2.1 + v1.3 — MVP local del e-commerce completado (HEAD `75ca293`), con cambios locales sin commit posteriores al checkpoint; el estado exacto se consulta con `git status`
 - **PROD (rama `master` → GitHub Pages):** v1.2.1 — sin e-commerce académico
 
 ## Completado
@@ -766,7 +765,7 @@ Desacoplar la verificación de email del sistema Newsletter para reutilizarla en
 ## Pendiente
 
 - [ ] Validación final de v1.2.1 en producción
-- [ ] Frontend e-commerce v1.3 — pendientes posteriores del flujo de compra (reenvío de verificación, cancelación de Pedido y estado `EN_PROCESO`); el flujo de compra de los Bloques 5 y 6 está cerrado
+- [ ] Frontend e-commerce v1.3 — pendientes posteriores del flujo de compra (cancelación de Pedido y estado `EN_PROCESO`); el flujo de compra de los Bloques 5 y 6 está cerrado
 - [ ] Despliegue del e-commerce a PROD (no realizado; fuera del alcance actual)
 - [ ] README preparado según los requisitos académicos (etapa posterior)
 
@@ -778,7 +777,7 @@ Desacoplar la verificación de email del sistema Newsletter para reutilizarla en
 - `ef6d7d8` — Visor de fotos v1.2.1 - proteger paneo durante pinch
 - `7c01421` → `75ca293` — serie completa de la etapa v1.3 (11 commits: catálogo, carrito, checkout, verificación, pago, continuación en drawer y cierre del checkout); relación exacta en `documentacion/CHANGELOG.md`
 - **HEAD actual de `dev`:** `75ca293` — `feat: finalizar checkout con confirmacion de pedido` (2026-10-09)
-- Cambios sin commit al 10/10/2026: 5 archivos JavaScript, exclusivamente de comentarios (+181 / −41), y los 3 documentos de cierre (`documentacion/CHANGELOG.md`, `documentacion/ROADMAP.md`, `documentacion/PROJECT_STATE.md`)
+- **Nota histórica (10/10/2026):** había 5 archivos JavaScript modificados exclusivamente con comentarios (+181 / −41) y 3 documentos de cierre actualizados. No describe el working tree posterior.
 
 > Verificado: `ef6d7d8` (v1.2.1) está contenido en `master` (verificado con `git merge-base --is-ancestor ef6d7d8 master`).
 > **Corrección (10/10/2026):** la afirmación anterior "`dev` y `master` solo difieren en `scripts/api/apiConfig.js`" correspondía a agosto de 2026 y ya no es válida. Comparadas hoy, `master` y `dev` difieren en 14 archivos: los 13 de la etapa v1.3 (frontend de tienda, cliente de API, documentación y `tests/checkoutA.test.mjs`) más `scripts/api/apiConfig.js` (`ENVIRONMENT: "DEV"` en `dev` vs `"PROD"` en `master`).
@@ -789,7 +788,7 @@ Desacoplar la verificación de email del sistema Newsletter para reutilizarla en
 Orden recomendado al 10/10/2026:
 
 1. Finalizar y organizar la documentación técnica de cierre del MVP (en curso: CHANGELOG, ROADMAP y PROJECT_STATE).
-2. Registrar, cuando corresponda implementarlos, los pendientes posteriores del flujo de compra (reenvío de verificación, cancelación de Pedido y estado `EN_PROCESO`).
+2. Registrar, cuando corresponda implementarlos, los pendientes posteriores del flujo de compra (cancelación de Pedido y estado `EN_PROCESO`).
 3. Revisar la auditoría de calidad del visor y validar la publicación de v1.2.1 en producción.
 4. Definir en su momento el despliegue del e-commerce (hoy fuera de alcance; `master` permanece en v1.2.1).
 
