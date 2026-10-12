@@ -1062,7 +1062,7 @@ body.carrito-abierto {
    MENSAJE BLOQUEANTE: PEDIDO CREADO
    ========================== */
 
-/* Fondo bloqueado mientras el mensaje está visible */
+/* Fondo bloqueado mientras el mensaje estï¿½ visible */
 body.pedido-creado-abierto {
 
     overflow: hidden;
@@ -1126,5 +1126,20 @@ body.pedido-creado-abierto {
     margin: 0 0 1.5rem;
 
     line-height: 1.6;
+
+}
+
+.pedido-creado-reenvio-estado {
+
+    color: var(--text);
+
+}
+
+.pedido-creado-acciones {
+
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
 
 }

@@ -1,5 +1,12 @@
 // /////////////////////////////////////////////////////////////////////////////
-// TIENDA — CATÁLOGO + CARRITO (Bloque 2 · parte 2)
+// TIENDA — CATÁLOGO, CARRITO Y COMPRA (Bloques 2 a 6)
+//
+// Renderiza pages/tienda.html de punta a punta. Flujo completo:
+//   catálogo (GET /api/productos) -> carrito -> checkout (datos del
+//   comprador, crearPedido) -> mensaje modal de pedido creado ->
+//   verificación del email en pages/resultado.html -> recuperación del
+//   Pedido con ?token= (iniciarContinuacionDeCompra) -> pago simulado
+//   -> confirmación de la compra.
 //
 // Fuente de datos:
 // API REST del e-commerce separado (GET /api/productos)
@@ -12,8 +19,6 @@
 // El botón del carrito abre un drawer responsive con
 // cantidades (+ / −), eliminar y totales informativos.
 //
-// Este archivo solamente se encarga
-// de renderizar pages/tienda.html
 //
 // El drawer del carrito también presenta el checkout:
 // formulario de datos del comprador y envío del pedido
@@ -24,7 +29,10 @@
 // pie pasa a [Pagar] y todos los mensajes (recuperación,
 // pago, corrección, rechazo, confirmación) salen en
 // #carrito-estado, dentro del drawer.
-// Pendiente: reenvío de email y cancelación.
+// Tras el alta, el mismo drawer muestra el mensaje modal con el
+// email del comprador: sólo [OK] lo cierra y vacía el carrito de
+// esa compra (Bloque 4).
+// Pendiente: cancelación.
 // /////////////////////////////////////////////////////////////////////////////
 
 import {
@@ -109,8 +117,19 @@ const checkoutEnviar =
 const checkoutEstado =
     document.querySelector("#checkout-estado");
 
-// Estado del flujo de compra dentro del mismo drawer (recuperación del
-// Pedido, procesamiento del pago, corrección, rechazo o confirmación).
+// Zona de mensajes del flujo de compra dentro del mismo drawer. El
+// drawer alterna tres vistas: lista del carrito, checkout (datos del
+// comprador) y esta zona, a la que salen todos los mensajes:
+// recuperación, pago, corrección, rechazo o confirmación.
+//
+// Estados del flujo, en orden:
+//   pre-checkout: carrito -> "enviando" -> pedido creado (mensaje
+//     modal aparte) | corrección (aplica carrito_corregido y permite
+//     reintentar) | error (conserva lo tipeado)
+//   post-verificación: recuperando -> Pedido PEND_PAGO con [Pagar]
+//     -> procesando -> aprobado (compra confirmada) | rechazado
+//     (reintento mientras siga PEND_PAGO) | corrección (reintento con
+//     el carrito ajustado) | error terminal (vuelve al modo normal)
 const carritoEstado =
     document.querySelector("#carrito-estado");
 
@@ -120,6 +139,18 @@ const pedidoCreadoOverlay =
 
 const pedidoCreadoOk =
     document.querySelector("#pedido-creado-ok");
+
+const pedidoCreadoTexto =
+    document.querySelector("#pedido-creado-texto");
+
+const pedidoCreadoErrorEmail =
+    document.querySelector("#pedido-creado-error-email");
+
+const pedidoCreadoReenviar =
+    document.querySelector("#pedido-creado-reenviar");
+
+const pedidoCreadoReenvioEstado =
+    document.querySelector("#pedido-creado-reenvio-estado");
 
 // Dirección de email del comprador mostrada dentro del mensaje
 // (insertada con textContent, nunca con innerHTML)
@@ -645,7 +676,10 @@ function volverAlCarrito() {
 // cambios de vista dentro de la misma carga de la página.
 let pedidoCreado = null;
 
-// Evita doble submit mientras crearPedido() está en curso.
+// Evita doble submit mientras crearPedido() está en curso. Uno de los
+// tres candados anti-duplicado del flujo: enviandoPedido (alta en
+// vuelo), pedidoCreado (alta hecha, esperando [OK]) y pagoEnCurso
+// (reemplazo o pago en vuelo).
 let enviandoPedido = false;
 
 export function obtenerPedidoCreado() {
@@ -876,7 +910,10 @@ function leerDatosCheckout() {
 
 function construirItemsPedido() {
 
-    // Snapshot del carrito: sólo los campos que espera el backend.
+    // Snapshot del carrito en el formato exacto que espera el backend:
+    // { producto_id, cantidad, precio_unitario } por ítem. El mismo
+    // arreglo se usa para crearPedido(), para el reemplazo A -> B y
+    // para iniciarPago().
     return obtenerCarrito().map(item => ({
 
         producto_id: item.producto_id,
@@ -1006,7 +1043,10 @@ async function manejarEnvioPedido(evento) {
         // reaparecer en la siguiente carga de la tienda.
         marcarPedidoCreado(pedido.id);
 
-        mostrarMensajePedidoCreado(datos.email);
+        mostrarMensajePedidoCreado(
+            datos.email,
+            respuesta.data.email_enviado !== false
+        );
 
         return;
 
@@ -1060,13 +1100,28 @@ async function manejarEnvioPedido(evento) {
 //
 // Tras el alta confirmada por el backend, ESTA pestaña muestra un mensaje
 // modal bloqueante: el carrito se conserva intacto, no se refresca el
-// catálogo y no hay interacciones con el resto de la página. El único
-// control funcional es [OK].
+// catálogo y no hay interacciones con el resto de la página. Si el backend
+// informa email_enviado === false, el modal agrega el reenvío del mismo
+// Pedido; nunca vuelve a crear uno.
+//
+// El bloqueo evita que esta pestaña siga operando la misma compra
+// mientras la verificación del email continúa en otra pestaña.
 //
 // [OK] vacía el carrito con la función existente vaciarCarrito(), limpia
 // el contexto local del pedido y del checkout, y recarga el catálogo
 // desde la API (disponibilidad habitual, sin fórmulas nuevas). No se
 // cancela nada en el backend.
+//
+// El carrito se vacía en exactamente tres situaciones del flujo, cada
+// una por su motivo:
+//   - pago aprobado con estado PAGADO (manejarRespuestaPago): la
+//     compra quedó registrada en el backend;
+//   - [OK] sobre este mensaje (confirmarPedidoCreado): el usuario
+//     cerró el mensaje de la compra creada;
+//   - recarga con la marca activa (limpiarPedidoCreadoPendiente):
+//     nadie presionó [OK] y ese carrito no debe reaparecer.
+// El rechazo y los errores de red lo conservan tal cual; la
+// corrección lo reemplaza por lo que propuso el backend.
 //
 // La marca en sessionStorage (propia de ESTA pestaña) garantiza que,
 // si el usuario recarga o restaura la pestaña sin presionar [OK], al
@@ -1078,6 +1133,8 @@ async function manejarEnvioPedido(evento) {
 const CLAVE_PEDIDO_CREADO = "incancelables_pedido_creado";
 
 let mensajePedidoCreadoVisible = false;
+
+let reenviandoEmailPedido = false;
 
 function marcarPedidoCreado(pedidoId) {
 
@@ -1124,7 +1181,7 @@ function desmarcarPedidoCreado() {
 
 }
 
-function mostrarMensajePedidoCreado(email) {
+function mostrarMensajePedidoCreado(email, emailEnviado = true) {
 
     if (!pedidoCreadoOverlay || mensajePedidoCreadoVisible) return;
 
@@ -1136,6 +1193,32 @@ function mostrarMensajePedidoCreado(email) {
     if (pedidoCreadoEmail) {
 
         pedidoCreadoEmail.textContent = email ?? "";
+
+    }
+
+    if (pedidoCreadoTexto) {
+
+        pedidoCreadoTexto.hidden = !emailEnviado;
+
+    }
+
+    if (pedidoCreadoErrorEmail) {
+
+        pedidoCreadoErrorEmail.hidden = emailEnviado;
+
+    }
+
+    if (pedidoCreadoReenvioEstado) {
+
+        pedidoCreadoReenvioEstado.hidden = true;
+        pedidoCreadoReenvioEstado.textContent = "";
+
+    }
+
+    if (pedidoCreadoReenviar) {
+
+        pedidoCreadoReenviar.hidden = emailEnviado;
+        pedidoCreadoReenviar.disabled = false;
 
     }
 
@@ -1151,7 +1234,7 @@ function mostrarMensajePedidoCreado(email) {
 
     document.addEventListener("focusin", retenerFocoEnElMensaje);
 
-    pedidoCreadoOk?.focus();
+    (emailEnviado ? pedidoCreadoOk : pedidoCreadoReenviar)?.focus();
 
 }
 
@@ -1170,6 +1253,25 @@ function ocultarMensajePedidoCreado() {
 
     }
 
+    if (pedidoCreadoTexto) pedidoCreadoTexto.hidden = false;
+    if (pedidoCreadoErrorEmail) pedidoCreadoErrorEmail.hidden = true;
+
+    if (pedidoCreadoReenviar) {
+
+        pedidoCreadoReenviar.hidden = true;
+        pedidoCreadoReenviar.disabled = false;
+
+    }
+
+    if (pedidoCreadoReenvioEstado) {
+
+        pedidoCreadoReenvioEstado.hidden = true;
+        pedidoCreadoReenvioEstado.textContent = "";
+
+    }
+
+    reenviandoEmailPedido = false;
+
     document.body.classList.remove("pedido-creado-abierto");
 
     document.removeEventListener("keydown", bloquearTecladoDelMensaje, true);
@@ -1180,8 +1282,21 @@ function ocultarMensajePedidoCreado() {
 
 }
 
-// Escape no descarta el mensaje y Tab no sale del atrapado del foco:
-// el único control enfocable es [OK].
+function controlesDelMensajePedidoCreado() {
+
+    return [pedidoCreadoReenviar, pedidoCreadoOk].filter(control =>
+        control && !control.hidden && !control.disabled
+    );
+
+}
+
+function enfocarControlDelMensajePedidoCreado() {
+
+    controlesDelMensajePedidoCreado()[0]?.focus();
+
+}
+
+// Escape no descarta el mensaje y Tab cicla entre sus controles visibles.
 function bloquearTecladoDelMensaje(evento) {
 
     if (evento.key !== "Escape" && evento.key !== "Tab") return;
@@ -1190,7 +1305,19 @@ function bloquearTecladoDelMensaje(evento) {
 
     evento.stopPropagation?.();
 
-    if (evento.key === "Tab") pedidoCreadoOk?.focus();
+    if (evento.key !== "Tab") return;
+
+    const controles = controlesDelMensajePedidoCreado();
+
+    if (controles.length === 0) return;
+
+    const indiceActual = controles.indexOf(document.activeElement);
+    const desplazamiento = evento.shiftKey ? -1 : 1;
+    const indiceSiguiente = indiceActual < 0
+        ? 0
+        : (indiceActual + desplazamiento + controles.length) % controles.length;
+
+    controles[indiceSiguiente].focus();
 
 }
 
@@ -1216,7 +1343,89 @@ function retenerFocoEnElMensaje(evento) {
 
     if (pedidoCreadoOverlay.contains(evento.target)) return;
 
-    pedidoCreadoOk?.focus();
+    enfocarControlDelMensajePedidoCreado();
+
+}
+
+function mostrarEstadoReenvioPedidoCreado(mensaje) {
+
+    if (!pedidoCreadoReenvioEstado) return;
+
+    pedidoCreadoReenvioEstado.textContent = mensaje;
+    pedidoCreadoReenvioEstado.hidden = false;
+
+}
+
+function mensajeDeCooldown(segundos) {
+
+    const segundosEnteros = Number.isInteger(segundos) && segundos > 0
+        ? segundos
+        : null;
+
+    if (segundosEnteros === null) {
+
+        return "Esperá unos minutos antes de volver a solicitar el email.";
+
+    }
+
+    const minutos = Math.ceil(segundosEnteros / 60);
+
+    return `Podés solicitar otro email en ${minutos} minuto${minutos === 1 ? "" : "s"}.`;
+
+}
+
+async function reenviarEmailPedidoCreado() {
+
+    if (reenviandoEmailPedido || !pedidoCreadoReenviar) return;
+
+    if (!pedidoCreado?.id) {
+
+        mostrarEstadoReenvioPedidoCreado(
+            "No pudimos identificar el pedido para reenviar el email."
+        );
+
+        return;
+
+    }
+
+    reenviandoEmailPedido = true;
+    pedidoCreadoReenviar.disabled = true;
+    mostrarEstadoReenvioPedidoCreado("Reenviando email de verificación...");
+
+    const respuesta = await reenviarVerificacionEmail(pedidoCreado.id);
+
+    reenviandoEmailPedido = false;
+
+    if (respuesta?.ok && respuesta.data?.resultado === "reenviado") {
+
+        pedidoCreadoReenviar.hidden = true;
+        mostrarEstadoReenvioPedidoCreado(
+            "Te reenviamos el correo de verificación. Revisá tu bandeja de entrada."
+        );
+        pedidoCreadoOk?.focus();
+
+        return;
+
+    }
+
+    pedidoCreadoReenviar.disabled = false;
+
+    if (respuesta?.codigo === "cooldown_activo") {
+
+        mostrarEstadoReenvioPedidoCreado(
+            mensajeDeCooldown(respuesta.data?.segundos_restantes)
+        );
+
+        pedidoCreadoReenviar.focus();
+
+        return;
+
+    }
+
+    mostrarEstadoReenvioPedidoCreado(
+        "No pudimos reenviar el correo. Intentá nuevamente."
+    );
+    pedidoCreadoReenviar.focus();
 
 }
 
@@ -1300,6 +1509,11 @@ let tokenVerificacion = null;
 // Pedido que se está continuando: { id, estado, items[] }.
 // items[] es el snapshot persistido del Pedido activo: decide si el
 // carrito cambió, no es la fuente de items a pagar.
+// Estados que acá se interpretan: "PEND_PAGO" (hay [Pagar]),
+// "PAGADO" (compra confirmada) y "PAGADO_STOCK_NO_AFECTADO" (pago
+// registrado que requiere revisión). La recuperación sólo selecciona
+// Pedidos en PEND_PAGO; cualquier otro estado en la respuesta no
+// continúa.
 let pedidoContinuar = null;
 
 // Evita doble envío mientras reemplazarPedido() / iniciarPago() están
@@ -1354,6 +1568,11 @@ const MENSAJE_DE_COMPRA_FALLIDA =
 // ---------------------------------------------------------------------------
 // LECTURA DEL TOKEN Y ESTADO DENTRO DEL DRAWER
 // ---------------------------------------------------------------------------
+//
+// leerTokenDeUrl() toma ?token= de la URL de ESTA pestaña y el valor
+// queda sólo en tokenVerificacion (memoria del módulo): no se copia a
+// ningún almacenamiento persistente. Sin ese parámetro en la URL no
+// hay ninguna otra puerta de entrada al modo continuación.
 
 function leerTokenDeUrl() {
 
@@ -1520,6 +1739,14 @@ function esErrorTerminalDeCompra(codigo) {
 // ---------------------------------------------------------------------------
 // RECUPERACIÓN DEL PEDIDO VERIFICADO
 // ---------------------------------------------------------------------------
+//
+// Contrato (detalle en tiendaClient.obtenerPedidosVerificados):
+//   POST /email-verificaciones/pedidos con el token de la URL
+//   -> { pedidos: [ { id, estado, items[] } ] }
+//
+// Sólo continúa el Pedido en estado "PEND_PAGO" que traiga items; si
+// no hay ninguno utilizable, falloDeRecuperacion() restaura la vista
+// normal con el carrito local intacto.
 
 async function iniciarContinuacionDeCompra() {
 
@@ -1721,6 +1948,15 @@ function itemsIgualesAlSnapshot(actual, snapshot) {
 
 }
 
+// Pago del Pedido activo, en tres pasos:
+// 1) sin items no hay request posible: se avisa y se corta;
+// 2) si los items difieren del snapshot del Pedido, primero se pide el
+//    reemplazo A -> B; con corrección comercial el flujo termina ahí,
+//    sin pagar;
+// 3) recién con el Pedido vigente se llama iniciarPago() enviando
+//    el token recibido por email y SIMULACION_PAGO; la respuesta
+//    (aprobado, rechazado, corrección o error) se delega siempre a
+//    manejarRespuestaPago().
 async function procesarPago() {
 
     if (pagoEnCurso || !modoPostVerificacionActivo()) return;
@@ -1846,6 +2082,7 @@ async function procesarPago() {
 
         respuesta = await iniciarPago(
             pedidoContinuar.id,
+            tokenVerificacion,
             items,
             SIMULACION_PAGO
         );
@@ -1863,6 +2100,16 @@ async function procesarPago() {
 
 // Traduce la respuesta real del backend a un estado del drawer.
 // Único punto que decide si la compra está confirmada.
+//
+// Contrato de data (detalle en tiendaClient.iniciarPago):
+//   data.resultado: "aprobado" | "rechazado" | "correccion";
+//   con aprobado, data.pedido.estado confirma si la compra quedó
+//   "PAGADO" (confirmada) o "PAGADO_STOCK_NO_AFECTADO" (pago
+//   registrado que requiere revisión); otro estado cae en el mensaje
+//   de fallo.
+// Cuando ok es false sólo existe respuesta.codigo (crudo): se traduce
+// con los mapas de mensajes o dispara el corte terminal; nunca se
+// muestra al usuario.
 async function manejarRespuestaPago(respuesta) {
 
     // --------------------------------
@@ -1899,7 +2146,8 @@ async function manejarRespuestaPago(respuesta) {
 
     if (datos.resultado === "aprobado") {
 
-        // Único caso de compra confirmada: vacía el carrito.
+        // Único caso de compra confirmada: vacía el carrito (una de
+        // las tres situaciones de vaciado descritas en PEDIDO CREADO).
         if (pedido.estado === "PAGADO") {
 
             vaciarCarrito();
@@ -2480,6 +2728,8 @@ function initCarrito() {
 
     // Mensaje bloqueante de pedido creado: sólo [OK] avanza.
     pedidoCreadoOk?.addEventListener("click", confirmarPedidoCreado);
+
+    pedidoCreadoReenviar?.addEventListener("click", reenviarEmailPedidoCreado);
 
     // El envío es un submit del formulario: el pedido se crea en
     // manejarEnvioPedido().

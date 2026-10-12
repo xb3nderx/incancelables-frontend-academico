@@ -1,13 +1,39 @@
 // =====================================
-// PÁGINA DE RESULTADO
+// PÁGINA DE RESULTADO — ROUTER DE FLUJOS
 // =====================================
 //
 // resultado.js corre como script clásico (se carga con
-// <script src>) y sólo presenta el resultado de la
-// verificación de email del checkout.
+// <script src>) y enruta la página según los parámetros
+// de la URL (flow, token, status). Cuatro flujos:
 //
-// La compra NO continúa acá: el token se propaga a la
-// tienda, que recupera el Pedido desde el backend.
+// 1. flow=checkout (+ token): verificación de email del
+//    checkout del e-commerce. Consulta con
+//    validarTokenCheckout() y, si confirma, ofrece
+//    "Continuar compra" (enlace a tienda.html?token=...).
+//    La compra NO continúa acá: esta página no recupera
+//    items ni ejecuta el pago; el token se propaga tal
+//    cual llegó en la URL actual (sin persistirlo).
+//
+// 2. flow=subscribe (+ token): confirmación de
+//    suscripción a la comunidad (backend del sitio con
+//    action=confirm-json); al confirmar registra el evento
+//    community_signup_confirmed.
+//
+// 3. flow=unsubscribe (+ token): baja de novedades
+//    (action=unsubscribe-json), con botón manual de
+//    confirmación.
+//
+// 4. Sin flow (o sin los parámetros esperados): sólo
+//    presenta el estado recibido en status (?status=...).
+//
+// mostrarEstado() traduce cualquier status a texto de la
+// página: confirmado, checkout_confirmado, desuscripto,
+// ya_desuscripto, token_invalido, token_expirado o el
+// genérico de error.
+//
+// Depende de: apiConfig.js (API), analytics.js (Analytics),
+// tiendaConfig.js + tiendaClient.js (validarTokenCheckout)
+// y de los elementos de pages/resultado.html.
 
 // =====================================
 // PARÁMETROS URL

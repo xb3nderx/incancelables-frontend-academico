@@ -5,7 +5,7 @@
 // verificación clásica por enlace de email, sin continuidad entre pestañas
 // mediante BroadcastChannel.
 //
-// Cubren los 12 puntos pedidos:
+// Cubren los 16 puntos pedidos:
 //  1. Pedido creado => mensaje bloqueante visible.
 //  2. El carrito permanece intacto mientras el mensaje se muestra.
 //  3. No se puede interactuar con otros controles.
@@ -23,6 +23,9 @@
 //     pedido creado en A, y A conserva su limpieza al recargar.
 // 15. El mensaje muestra el email del comprador, insertado con
 //     textContent (sin HTML) y sin persistirlo en ningún storage.
+// 16. Un Pedido con email_enviado === false conserva el carrito y permite
+//     reenviar la verificación sin crear otro Pedido.
+// 17. El pago reutiliza el token recibido por email durante la recuperación.
 //
 // tienda.js y carrito.js corren con un DOM / storage falsos. resultado.js se
 // evalúa como script clásico con un documento falso. Node puro, sin
@@ -193,7 +196,8 @@ const fakes = {};
 
 const contador = {
     crear: 0,
-    catalogo: 0
+    catalogo: 0,
+    reenvio: 0
 };
 
 function restaurarFakes() {
@@ -206,6 +210,11 @@ function restaurarFakes() {
     fakes.crearPedido = async () => ({
         ok: false,
         message: "crearPedido no configurado en el test"
+    });
+
+    fakes.reenviarVerificacionEmail = async () => ({
+        ok: false,
+        message: "reenviarVerificacionEmail no configurado en el test"
     });
 
     fakes.obtenerPedidosVerificados = async () => ({
@@ -234,6 +243,10 @@ globalThis.obtenerCatalogo = (...a) => {
 globalThis.crearPedido = (...a) => {
     contador.crear += 1;
     return fakes.crearPedido(...a);
+};
+globalThis.reenviarVerificacionEmail = (...a) => {
+    contador.reenvio += 1;
+    return fakes.reenviarVerificacionEmail(...a);
 };
 globalThis.obtenerPedidosVerificados = (...a) => fakes.obtenerPedidosVerificados(...a);
 globalThis.reemplazarPedido = (...a) => fakes.reemplazarPedido(...a);
@@ -380,7 +393,11 @@ const IDS = [
     "#checkout-estado",
     "#carrito-estado",
     "#pedido-creado-overlay",
+    "#pedido-creado-texto",
     "#pedido-creado-email",
+    "#pedido-creado-error-email",
+    "#pedido-creado-reenvio-estado",
+    "#pedido-creado-reenviar",
     "#pedido-creado-ok"
 ];
 
@@ -496,8 +513,11 @@ function crearPestana(busqueda = "") {
 
     const dialogo = crearElemento("div");
     const titulo = crearElemento("h2");
-    const texto = crearElemento("p");
+    const texto = elementos.get("#pedido-creado-texto");
     const emailSpan = elementos.get("#pedido-creado-email");
+    const errorEmail = elementos.get("#pedido-creado-error-email");
+    const estadoReenvio = elementos.get("#pedido-creado-reenvio-estado");
+    const reenviarBoton = elementos.get("#pedido-creado-reenviar");
     const okBoton = elementos.get("#pedido-creado-ok");
 
     // Copia del párrafo como en pages/tienda.html: el email se inserta
@@ -514,6 +534,10 @@ function crearPestana(busqueda = "") {
         "Abrí el enlace recibido para verificar tu dirección " +
         "de correo y continuar con el pago en una nueva pestaña.";
     okBoton.textContent = "OK";
+    errorEmail.hidden = true;
+    estadoReenvio.hidden = true;
+    reenviarBoton.hidden = true;
+    reenviarBoton.textContent = "Reenviar email";
 
     texto.appendChild(textoAntes);
     texto.appendChild(emailSpan);
@@ -521,6 +545,9 @@ function crearPestana(busqueda = "") {
 
     dialogo.appendChild(titulo);
     dialogo.appendChild(texto);
+    dialogo.appendChild(errorEmail);
+    dialogo.appendChild(estadoReenvio);
+    dialogo.appendChild(reenviarBoton);
     dialogo.appendChild(okBoton);
     overlay.appendChild(dialogo);
 
@@ -672,6 +699,7 @@ function nuevaSesion() {
 
     contador.crear = 0;
     contador.catalogo = 0;
+    contador.reenvio = 0;
 
 }
 
@@ -679,9 +707,9 @@ function nuevaSesion() {
 // Flujos de usuario
 // ---------------------------------------------------------------------------
 
-async function sembrar(items) {
+async function sembrar(items, busqueda = "") {
 
-    const pane = crearPestana("");
+    const pane = crearPestana(busqueda);
 
     await como(pane, async () => {
         for (const item of items) {
@@ -774,6 +802,10 @@ function overlayDe(pane) {
 
 function okDe(pane) {
     return pane.elementos.get("#pedido-creado-ok");
+}
+
+function reenviarDe(pane) {
+    return pane.elementos.get("#pedido-creado-reenviar");
 }
 
 function badgeDe(pane) {
@@ -1002,7 +1034,7 @@ await caso(
             "T04 el foco se retiene en [OK]"
         );
 
-        // Markup real: el mensaje tiene un único botón ([OK]); sin X.
+        // Markup real: el reenvío está disponible sólo como segundo botón.
         const seccion = fuenteHtml.slice(
             fuenteHtml.indexOf("pedido-creado-overlay")
         );
@@ -1010,8 +1042,8 @@ await caso(
 
         igual(
             botones.length,
-            1,
-            "T04 el markup del mensaje tiene un solo <button> ([OK]), sin X"
+            2,
+            "T04 el markup del mensaje tiene [Reenviar email] y [OK], sin X"
         );
 
     }
@@ -1748,6 +1780,198 @@ await caso(
             A.sessionStorage.getItem("incancelables_pedido_creado"),
             "101",
             "T15 la única marca persistida es la del id del pedido"
+        );
+
+    }
+);
+
+// ===========================================================================
+// T16 · email no enviado: reenvío sobre el mismo Pedido
+// ===========================================================================
+
+await caso(
+    "T16 · email_enviado false conserva el Pedido y permite reintentar el reenvío",
+    async () => {
+
+        nuevaSesion();
+
+        fakes.crearPedido = async () => ({
+            ok: true,
+            data: {
+                resultado: "creado",
+                pedido: { id: 101, estado: "PEND_VERIF" },
+                email_enviado: false
+            }
+        });
+
+        const respuestasReenvio = [
+            {
+                ok: false,
+                codigo: "error_envio_email",
+                data: null
+            },
+            {
+                ok: false,
+                codigo: "cooldown_activo",
+                data: { segundos_restantes: 61 }
+            },
+            {
+                ok: true,
+                data: { resultado: "reenviado" }
+            }
+        ];
+        const pedidosReenviados = [];
+
+        fakes.reenviarVerificacionEmail = async pedidoId => {
+            pedidosReenviados.push(pedidoId);
+
+            return respuestasReenvio.shift();
+        };
+
+        const creada = await sembrar([{ id: 1, cantidad: 2 }]);
+        const A = creada.pane;
+
+        await abrirCheckout(A);
+        await enviarPedido(A);
+        await hasta(() => overlayDe(A).hidden === false);
+
+        ok(
+            A.elementos.get("#pedido-creado-texto").hidden,
+            "T16 no afirma que el email fue enviado"
+        );
+        ok(
+            !A.elementos.get("#pedido-creado-error-email").hidden,
+            "T16 informa el fallo de envío"
+        );
+        ok(!reenviarDe(A).hidden, "T16 muestra el botón de reenvío");
+        igual(
+            A.documento.activeElement === reenviarDe(A),
+            true,
+            "T16 el foco inicial queda en [Reenviar email]"
+        );
+        igual((await carritoDe(A)).length, 1, "T16 el carrito queda intacto");
+        igual(await flagEn(A), "101", "T16 conserva la marca del Pedido existente");
+
+        await como(A, async () => {
+            reenviarDe(A).dispatch("click", {});
+            await dormir(80);
+        });
+
+        igual(contador.crear, 1, "T16 el reenvío no crea otro Pedido");
+        igual(contador.reenvio, 1, "T16 solicita un único reenvío");
+        igual(pedidosReenviados, [101], "T16 reenvía el id del Pedido creado");
+        ok(
+            A.elementos.get("#pedido-creado-reenvio-estado").textContent
+                .includes("No pudimos reenviar el correo"),
+            "T16 informa el error de envío sin cerrar el modal"
+        );
+        ok(!reenviarDe(A).hidden, "T16 el error mantiene disponible el reenvío");
+        igual((await carritoDe(A)).length, 1, "T16 el error no modifica el carrito");
+
+        await como(A, async () => {
+            reenviarDe(A).dispatch("click", {});
+            await dormir(80);
+        });
+
+        igual(contador.reenvio, 2, "T16 vuelve a solicitar el reenvío tras el error");
+        ok(
+            A.elementos.get("#pedido-creado-reenvio-estado").textContent
+                .includes("2 minutos"),
+            "T16 informa el cooldown existente"
+        );
+        ok(!reenviarDe(A).hidden, "T16 el cooldown mantiene disponible el reenvío");
+        igual((await carritoDe(A)).length, 1, "T16 el cooldown no modifica el carrito");
+
+        await como(A, async () => {
+            reenviarDe(A).dispatch("click", {});
+            await dormir(80);
+        });
+
+        igual(contador.reenvio, 3, "T16 permite volver a solicitar el reenvío");
+        ok(reenviarDe(A).hidden, "T16 oculta el reenvío tras éxito");
+        ok(
+            A.elementos.get("#pedido-creado-reenvio-estado").textContent
+                .includes("Te reenviamos el correo"),
+            "T16 confirma el reenvío exitoso"
+        );
+        igual((await carritoDe(A)).length, 1, "T16 el éxito del reenvío no modifica el carrito");
+
+    }
+);
+
+// ===========================================================================
+// T17 · pago autorizado por el token recibido por email
+// ===========================================================================
+
+await caso(
+    "T17 · el pago recibe el token recuperado desde la URL, sin persistirlo",
+    async () => {
+
+        nuevaSesion();
+
+        const tokensRecibidos = [];
+        const pagosIniciados = [];
+
+        fakes.obtenerPedidosVerificados = async token => {
+            tokensRecibidos.push(token);
+
+            return {
+                ok: true,
+                data: {
+                    pedidos: [
+                        {
+                            id: 101,
+                            estado: "PEND_PAGO",
+                            items: [
+                                { producto_id: 1, cantidad: 2, precio_unitario: 1000 }
+                            ]
+                        }
+                    ]
+                }
+            };
+        };
+
+        fakes.iniciarPago = async (...args) => {
+            pagosIniciados.push(args);
+
+            return {
+                ok: true,
+                data: {
+                    resultado: "rechazado",
+                    pedido: { id: 101, estado: "PEND_PAGO" }
+                }
+            };
+        };
+
+        const creada = await sembrar(
+            [{ id: 1, cantidad: 2 }],
+            "?token=tok-autorizado"
+        );
+        const A = creada.pane;
+
+        await hasta(() =>
+            A.elementos.get("#carrito-continuar").textContent === "Pagar"
+        );
+
+        await como(A, async () => {
+            A.elementos.get("#carrito-continuar").dispatch("click", {});
+            await dormir(100);
+        });
+
+        igual(tokensRecibidos, ["tok-autorizado"], "T17 recupera con el token de la URL");
+        igual(
+            pagosIniciados,
+            [[
+                101,
+                "tok-autorizado",
+                [{ producto_id: 1, cantidad: 2, precio_unitario: 1000 }],
+                "APROBADO"
+            ]],
+            "T17 inicia el pago con el mismo token recibido por email"
+        );
+        ok(
+            !A.sessionStorage._valores().some(valor => valor.includes("tok-autorizado")),
+            "T17 no persiste el token en sessionStorage"
         );
 
     }

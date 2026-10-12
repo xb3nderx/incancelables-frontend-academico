@@ -243,16 +243,8 @@ export function obtenerDisponibilidadBase(producto, respaldo = 0) {
 // DISPONIBILIDAD MOSTRADA (SOLO PRESENTACIÓN)
 // /////////////////////////////////////////////////////////////////////////////
 
-// Unidades que todavía puede agregar el usuario a SU carrito:
-//
-// disponibilidad_mostrada = disponibilidad_base - cantidad_en_carrito
-//
-// Ejemplo pre-Pedido: API = 10, carrito = 3 => se muestran 7.
-//
-// No modifica la disponibilidad base del ítem ni la de la API:
-// es un cálculo de lectura sobre sessionStorage, por lo que
-// se reconstruye en cada render y vuelve a crecer si baja
-// la cantidad en el carrito.
+// Cantidad de ese producto en el carrito actual (0 si no está o el id
+// no sirve): la base del cálculo de disponibilidad mostrada.
 
 export function obtenerCantidadDeProducto(productoId) {
 
@@ -271,6 +263,17 @@ export function obtenerCantidadDeProducto(productoId) {
         : 0;
 
 }
+
+// Unidades que todavía puede agregar el usuario a SU carrito:
+//
+// disponibilidad_mostrada = disponibilidad_base - cantidad_en_carrito
+//
+// Ejemplo pre-Pedido: API = 10, carrito = 3 => se muestran 7.
+//
+// No modifica la disponibilidad base del ítem ni la de la API:
+// es un cálculo de lectura sobre sessionStorage, por lo que
+// se reconstruye en cada render y vuelve a crecer si baja
+// la cantidad en el carrito.
 
 export function obtenerDisponibilidadMostrada(producto) {
 
@@ -665,10 +668,13 @@ export function aplicarCorreccion(corregido) {
 // VACIADO (BLOQUE 5)
 // /////////////////////////////////////////////////////////////////////////////
 
-// Vaciado único del carrito. Se ejecuta cuando el pago queda
-// aprobado y el Pedido pasa a PAGADO: cualquier otro resultado
-// del pago (rechazado, corrección, revisión, error de red)
-// conserva el carrito intacto.
+// Única función que vacía el carrito. El flujo de la tienda la llama
+// en exactamente tres situaciones: pago aprobado con estado PAGADO,
+// confirmación con [OK] del mensaje de pedido creado y limpieza al
+// recargar la pestaña con esa marca (los tres motivos, en detalle, en
+// el bloque PEDIDO CREADO de tienda.js). Ningún otro resultado de pago
+// (rechazado, revisión, error de red) lo vacía; la corrección lo
+// reemplaza por la propuesta del backend.
 //
 // El carrito NO es la fuente de items para pagar: una vez creado el
 // Pedido, los items[] que viajan a POST /api/pedidos/{id}/pago salen

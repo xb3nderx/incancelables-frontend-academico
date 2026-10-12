@@ -160,9 +160,9 @@
         <!-- ====================================================== 
                         MENSAJE BLOQUEANTE: PEDIDO CREADO 
         ======================================================= -->
-        <!-- Tras crear el pedido, tapa toda la tienda: el único control
-             funcional es [OK]. Escape, el fondo y otros controles no lo
-             cierran. Se muestra/oculta desde scripts/tienda.js. -->
+        <!-- Tras crear el pedido, tapa toda la tienda. Si el backend no pudo
+             enviar el email, ofrece sólo el reenvío del Pedido ya creado;
+             Escape, el fondo y otros controles no lo cierran. -->
         <div id="pedido-creado-overlay" class="pedido-creado-overlay" hidden>
             <div class="pedido-creado-dialogo" role="dialog" aria-modal="true"
                 aria-labelledby="pedido-creado-titulo" aria-describedby="pedido-creado-texto">
@@ -176,9 +176,20 @@
                     de correo y continuar con el pago en una nueva
                     pestaña.
                 </p>
-                <button id="pedido-creado-ok" class="btn pedido-creado-ok" type="button">
-                    OK
-                </button>
+                <p id="pedido-creado-error-email" hidden>
+                    El pedido fue creado, pero no pudimos enviar el correo de
+                    verificación. Podés reenviarlo ahora.
+                </p>
+                <p id="pedido-creado-reenvio-estado" class="pedido-creado-reenvio-estado"
+                    hidden aria-live="polite"></p>
+                <div class="pedido-creado-acciones">
+                    <button id="pedido-creado-reenviar" class="btn" type="button" hidden>
+                        Reenviar email
+                    </button>
+                    <button id="pedido-creado-ok" class="btn pedido-creado-ok" type="button">
+                        OK
+                    </button>
+                </div>
             </div>
         </div>
         <!-- SCRIPTS -->

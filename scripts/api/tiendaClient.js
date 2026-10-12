@@ -1,22 +1,41 @@
 // =======================================================
-// TIENDA CLIENT — Catálogo y creación de Pedido
+// TIENDA CLIENT — cliente HTTP de la tienda (v1.3)
 // =======================================================
 //
-// Consume la API REST del e-commerce separado.
+// Sólo transporte: consume la API REST del e-commerce separado y
+// normaliza cada respuesta. No aplica correcciones ni decide flujos:
+// eso lo hace tienda.js.
 //
-// MVP de v1.3: lectura del catálogo (GET /productos) y,
-// desde el Bloque 3, creación del Pedido
-// (POST /pedidos). Desde el Bloque 4, validación del token
-// de verificación de email del checkout
-// (POST /email-verificaciones/validar) y recuperación de los
-// Pedidos verificados (POST /email-verificaciones/pedidos);
-// desde el Bloque 5, inicio del pago del Pedido
-// (POST /pedidos/{id}/pago) y reemplazo del Pedido activo
-// (POST /email-verificaciones/pedidos/reemplazo).
-// Sin reenvío de email.
+// Endpoints (el contrato de cada uno, en su sección):
+//   GET  /productos                               obtenerCatalogo
+//   POST /pedidos                                 crearPedido
+//   POST /email-verificaciones/reenvio            reenviarVerificacionEmail
+//   POST /email-verificaciones/validar            validarTokenCheckout
+//   POST /email-verificaciones/pedidos            obtenerPedidosVerificados
+//   POST /email-verificaciones/pedidos/reemplazo  reemplazarPedido
+//   POST /pedidos/{id}/pago                       iniciarPago
+// El reenvío reutiliza el Pedido ya creado: no crea ni reemplaza Pedidos.
 //
-// Misma forma de respuesta que forms.js:
-// { ok, message, data }
+// Envelope de respuesta:
+//   { ok, message, data }      en obtenerCatalogo y crearPedido;
+//   { ok, message, data, codigo } en las otras cinco.
+//   ok: true cuando la respuesta se ajusta al contrato; false ante
+//   cualquier error (red, contrato o backend).
+//   message: vacío si ok es true; si no, motivo corto del fallo (del
+//   backend o redactado acá).
+//   data: cuerpo JSON cuando existe (también en errores HTTP o de
+//   contrato); null si no hay cuerpo utilizable.
+//   codigo: error crudo del backend cuando existe ("token_invalido",
+//   "pedido_vencido", ...); sólo para el mapeo interno de tienda.js,
+//   jamás se muestra; null en fallos de red o contrato.
+//
+// (forms.js, del sitio, devuelve { ok, code, message, data }: es la
+// convención de la API de Google Apps Script; los nombres de campos
+// NO son intercambiables entre ambos clientes.)
+//
+// Cada request lleva AbortSignal.timeout(TIENDA_API.TIMEOUT); si
+// falta TIENDA_API.URL (p. ej. un PROD inexistente) la función corta
+// antes de salir con ok: false.
 
 async function obtenerCatalogo() {
 
@@ -102,7 +121,7 @@ async function obtenerCatalogo() {
 //          donde cada item es
 //          { producto_id, cantidad, precio_unitario }
 //
-//   201 { resultado: "creado", pedido: { id, estado } }
+//   201 { resultado: "creado", pedido: { id, estado }, email_enviado }
 //   200 { resultado: "correccion", carrito_corregido,
 //         disponibilidad, motivos }
 //   400 { error }  (errores estructurales del request)
@@ -286,6 +305,168 @@ async function crearPedido(datos) {
             message: "No fue posible conectar con la tienda. Intentá nuevamente.",
 
             data: null
+
+        };
+
+    }
+
+}
+
+// =======================================================
+// REENVIAR VERIFICACIÓN — POST /email-verificaciones/reenvio
+// =======================================================
+//
+// Contrato real auditado del backend:
+//
+//   POST ${TIENDA_API.URL}/email-verificaciones/reenvio
+//   headers: Accept + Content-Type application/json
+//   body: { pedido_id }
+//
+//   200 { resultado: "reenviado", email_verificacion_id }
+//   429 { error: "cooldown_activo", segundos_restantes }
+//   502 { error: "error_envio_email" }
+//   400 / 404 / 409 / 500 { error }
+//
+// Envelope { ok, message, data, codigo }:
+//
+//   ok: true sólo ante 200 y resultado "reenviado".
+//   codigo conserva el error del backend para que tienda.js pueda
+//   distinguir el cooldown de un fallo de transporte.
+
+async function reenviarVerificacionEmail(pedidoId) {
+
+    try {
+
+        if (!TIENDA_API.URL) {
+
+            return {
+
+                ok: false,
+
+                message: "La API de la tienda no está configurada en este entorno.",
+
+                data: null,
+
+                codigo: null
+
+            };
+
+        }
+
+        const response = await fetch(
+            `${TIENDA_API.URL}/email-verificaciones/reenvio`,
+            {
+                method: "POST",
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ pedido_id: pedidoId }),
+                signal: AbortSignal.timeout(TIENDA_API.TIMEOUT)
+            }
+        );
+
+        const cuerpo = await response.json().catch(() => null);
+
+        if (
+            response.status === 200 &&
+            cuerpo &&
+            cuerpo.resultado === "reenviado"
+        ) {
+
+            return {
+
+                ok: true,
+
+                message: "",
+
+                data: cuerpo,
+
+                codigo: null
+
+            };
+
+        }
+
+        if (
+            cuerpo &&
+            typeof cuerpo.error === "string" &&
+            cuerpo.error !== ""
+        ) {
+
+            return {
+
+                ok: false,
+
+                message: cuerpo.error,
+
+                data: cuerpo,
+
+                codigo: cuerpo.error
+
+            };
+
+        }
+
+        if (!response.ok) {
+
+            return {
+
+                ok: false,
+
+                message: `HTTP ${response.status}`,
+
+                data: cuerpo,
+
+                codigo: null
+
+            };
+
+        }
+
+        return {
+
+            ok: false,
+
+            message: "Respuesta inesperada de la API",
+
+            data: cuerpo,
+
+            codigo: null
+
+        };
+
+    }
+    catch (error) {
+
+        if (
+            error &&
+            (error.name === "TimeoutError" || error.name === "AbortError")
+        ) {
+
+            return {
+
+                ok: false,
+
+                message: "La tienda tardó en responder. Intentá nuevamente.",
+
+                data: null,
+
+                codigo: null
+
+            };
+
+        }
+
+        return {
+
+            ok: false,
+
+            message: "No fue posible conectar con la tienda. Intentá nuevamente.",
+
+            data: null,
+
+            codigo: null
 
         };
 
@@ -981,6 +1162,7 @@ async function reemplazarPedido(token, items) {
 //   POST ${TIENDA_API.URL}/pedidos/{id}/pago
 //   headers: Accept + Content-Type application/json
 //   body: {
+//     token: token de verificación recibido por email,
 //     accion: "iniciar_pago",
 //     proveedor_id: "DUMMY",
 //     items: [ { producto_id, cantidad, precio_unitario } ],
@@ -996,6 +1178,7 @@ async function reemplazarPedido(token, items) {
 //        ("pedido_vencido" | "pedido_no_activo" |
 //         "pedido_no_pendiente_de_pago" | "pago_ya_aprobado" |
 //         "maximo_intentos_alcanzado" | "pedido_inexistente" |
+//         "token_invalido" | "token_expirado" |
 //         errores de request/proveedor)
 //
 // Envelope { ok, message, data, codigo }:
@@ -1018,7 +1201,7 @@ async function reemplazarPedido(token, items) {
 // El simulador MVP sólo admite "APROBADO" y "RECHAZADO";
 // "EN_PROCESO" queda fuera del alcance.
 
-async function iniciarPago(pedidoId, items, simulacion) {
+async function iniciarPago(pedidoId, token, items, simulacion) {
 
     try {
 
@@ -1062,7 +1245,31 @@ async function iniciarPago(pedidoId, items, simulacion) {
 
         }
 
+        // El pago sólo está autorizado por el token verificado que llegó
+        // desde la URL del email; no se genera ni persiste en este cliente.
+        if (
+            token === null ||
+            token === undefined ||
+            token === ""
+        ) {
+
+            return {
+
+                ok: false,
+
+                message: "No pudimos identificar la verificación de tu email.",
+
+                data: null,
+
+                codigo: null
+
+            };
+
+        }
+
         const cuerpoRequest = {
+
+            token,
 
             accion: "iniciar_pago",
 

@@ -1,6 +1,6 @@
-# ESTADO DEL PROYECTO — CHECKPOINT v1.2.1
+# ESTADO DEL PROYECTO — CHECKPOINT v1.2.1 (PROD) · MVP LOCAL v1.3 (dev)
 
-`PROJECT_STATE.md` es el **estado oficial y actualizado del proyecto INCANCELABLES WEB**, con checkpoint en **v1.2.1**.
+`PROJECT_STATE.md` es el **estado oficial y actualizado del proyecto INCANCELABLES WEB**: checkpoint de producción **v1.2.1** (`master`) y estado de cierre del **MVP local de v1.3 — E-commerce** al **10/10/2026** (rama `dev`).
 
 Este documento es público y puede subirse al repositorio GitHub. No contiene credenciales, tokens, secretos, IDs privados ni información sensible de infraestructura.
 
@@ -15,11 +15,13 @@ El proyecto tiene completadas las siguientes etapas:
 - v1.2 — Visor avanzado de fotografías
 - v1.2.1 — Protección del paneo durante pinch
 
-La versión actual del código es:
+La versión publicada en producción (`master` / GitHub Pages) es:
 
 **v1.2.1**
 
-Commit:
+En la rama de desarrollo `dev`, el estado vigente es el **MVP local de v1.3** (ver sección propia más abajo).
+
+Commit de PROD:
 
 `ef6d7d8`
 
@@ -37,6 +39,62 @@ La comprobación Git realizada fue:
 `git merge-base --is-ancestor ef6d7d8 master`
 
 con resultado verdadero.
+
+---
+
+# MVP LOCAL DE v1.3 AL 10/10/2026
+
+## Estado
+
+**CIERRE FUNCIONAL LOCAL** en la rama `dev` (HEAD `75ca293`, 2026-10-09), dentro del trabajo académico de e-commerce.
+
+- El flujo completo de compra está implementado y funcional en el MVP local.
+- El MVP local no presenta defectos bloqueantes conocidos.
+- **No hay despliegue:** `master` permanece en v1.2.1 y el e-commerce no está publicado (ver sección Cierre funcional local vs despliegue posterior).
+- Cambios sin commit al 10/10/2026: 5 archivos JavaScript, exclusivamente de comentarios (+181 / −41), y los 3 documentos de cierre (`documentacion/CHANGELOG.md`, `documentacion/ROADMAP.md`, `documentacion/PROJECT_STATE.md`).
+
+## Flujo completo implementado
+
+1. **Catálogo** (`pages/tienda.html`): productos desde `GET /api/productos` (API REST PHP del e-commerce).
+2. **Carrito** (`scripts/carrito.js`): persistencia en `sessionStorage`, drawer responsive con cantidades y totales informativos.
+3. **Checkout** (`scripts/tienda.js`): formulario guest, `POST /api/pedidos` → Pedido en `PEND_VERIF`, con correcciones comerciales reintentables.
+4. **Mensaje bloqueante de pedido creado:** modal con el email del comprador (insertado con `textContent`), único control [OK] y foco retenido; la creación queda marcada en `sessionStorage` (aislamiento por pestaña: ninguna otra pestaña ve la marca ni pierde su carrito).
+5. **Verificación de email:** enlace hacia `pages/resultado.html?flow=checkout&token=...` → `POST /api/email-verificaciones/validar` → **Continuar compra** hacia `pages/tienda.html?token=...`.
+6. **Recuperación del Pedido:** `POST /api/email-verificaciones/pedidos`; sólo continúa el Pedido en `PEND_PAGO`, que reemplaza (nunca fusiona) el carrito local. El token vive sólo en memoria; `BroadcastChannel` no se usa.
+7. **Pago simulado:** `POST /api/pedidos/{id}/pago` con simulación `APROBADO` (sin cobros reales); si los items del carrito difieren del snapshot del Pedido, primero `POST /api/email-verificaciones/pedidos/reemplazo`.
+8. **Resultados:** `PAGADO` ⇒ confirmación y vaciado del carrito; `PAGADO_STOCK_NO_AFECTADO` ⇒ mensaje de revisión con el carrito conservado; `rechazado` y `correccion` ⇒ reintento dentro del mismo drawer; errores identificables vuelven al modo normal de la tienda.
+
+## Validaciones disponibles
+
+- **Automatizada:** `node tests/checkoutA.test.mjs` → **88/88 PASS** (última corrida: 2026-10-10, con los cambios de comentarios todavía sin commit). Incluye aserciones estáticas sobre el fuente: sin `localStorage`, sin `BroadcastChannel`, marca con `sessionStorage.setItem(CLAVE_PEDIDO_CREADO)` y presencia de `mostrarContinuarCompra`, entre otras. Sintaxis `node --check` OK en los archivos intervenidos.
+- **Manual:** recorrido humano del flujo completo con **pago aprobado** (creación → verificación → recuperación → pago `APROBADO` → confirmación), validado sobre el MVP local. Es evidencia distinta de la automatizada.
+- Con motivo de la actualización documental del 10/10/2026 no se volvió a ejecutar ninguna suite.
+
+## Limitaciones conocidas
+
+- Sin reenvío de verificación de email ni cooldown.
+- Sin cancelación de Pedido ni estado `EN_PROCESO`.
+- Pago simulado (proveedor `DUMMY`, sólo `APROBADO`/`RECHAZADO`): el MVP académico no realiza cobros.
+- Token de verificación sólo en memoria: la única puerta de entrada es `?token=` en la URL.
+- Carrito con alcance por pestaña (`sessionStorage`), por diseño.
+- Deuda técnica conocida sin impacto funcional (auditoría interna previa al `75ca293`): `scripts/config/paths.js` sin uso, `aNumero` duplicada entre `scripts/tienda.js` y `scripts/carrito.js`, y `mostrarCorreccionDePago` / `mostrarCorreccionDeReemplazo` con lógica muy similar.
+- `README.md` sin actualizar: su preparación según los requisitos académicos es una etapa posterior.
+
+## Relación frontend / backend
+
+- **Este repositorio (Incancelables Web):** frontend estático del sitio y de la tienda; no contiene backend propio.
+- **Repositorio separado (Incancelables E-Commerce):** backend del e-commerce en **PHP + MariaDB** con **API REST**, consumido por el frontend mediante `scripts/api/tiendaClient.js`; email transaccional mediante **Resend**.
+- **Google Apps Script + Google Sheets:** se conservan como backend del sitio y de la comunidad/newsletter (formularios, confirmación y baja), sin cambios por el MVP.
+- Los tres conviven: el MVP no reemplaza ni migra el backend de Apps Script.
+
+## Cierre funcional local vs despliegue posterior
+
+| Concepto | Estado |
+| --- | --- |
+| Cierre funcional local del MVP | **COMPLETADO** — flujo completo, 88/88 automatizado, validación manual del pago aprobado, sin defectos bloqueantes conocidos |
+| Despliegue a PROD del e-commerce | **NO REALIZADO** — `master` continúa en v1.2.1; no habrá ventas ni cobros reales |
+| Último deploy del sitio | GitHub Pages `c4e7d20`, 2026-08-08, estado `success` (anterior a la etapa v1.3) |
+| Pendientes posteriores (no requisitos de cierre) | reenvío de verificación, cancelación de Pedido, estado `EN_PROCESO`, README académico |
 
 ---
 
@@ -155,7 +213,15 @@ La implementación fue validada con:
 
 **29/29 pruebas PASS**
 
-v1.2.1 constituye el último checkpoint funcional confirmado del proyecto.
+v1.2.1 constituye el último checkpoint funcional confirmado **en producción**; el cierre del MVP local de v1.3 se registra en la sección propia y en `documentacion/CHANGELOG.md`.
+
+---
+
+## v1.3 — E-commerce (proyecto académico)
+
+ESTADO: **MVP LOCAL COMPLETADO EN `dev` (SIN DESPLIEGUE)**
+
+Etapa desarrollada en la rama `dev`. El MVP local incluye catálogo, carrito, checkout con verificación de email, mensaje bloqueante de pedido creado, recuperación del Pedido, pago simulado y confirmación (ver sección MVP LOCAL DE v1.3). El backend del e-commerce vive en un repositorio separado (PHP + MariaDB). Pendientes posteriores: reenvío de verificación, cancelación de Pedido y estado `EN_PROCESO`.
 
 ---
 
@@ -177,6 +243,8 @@ No existen tareas funcionales pendientes correspondientes a v1.0, v1.1, v1.2 o v
 
 v1.3 se desarrolla en la rama `dev` como parte de un trabajo académico sobre e-commerce.
 
+Al 10/10/2026 el **MVP local está completado y validado** (ver sección MVP LOCAL DE v1.3): quedan como pendientes posteriores el reenvío de verificación, la cancelación de Pedido y el estado `EN_PROCESO`, y como etapa posterior cualquier decisión de despliegue.
+
 El alcance definitivo se determinará a partir de los requisitos de dicho trabajo.
 
 ### Despliegue a PROD
@@ -197,9 +265,9 @@ Estas tareas todavía no deben considerarse realizadas.
 
 ## v1.3 — E-commerce e infraestructura
 
-ESTADO: **EN DESARROLLO EN `dev`**
+ESTADO: **MVP LOCAL COMPLETADO EN `dev` — ETAPA ABIERTA**
 
-Etapa en curso, desarrollada como proyecto académico. El alcance se define a partir de los requisitos del trabajo académico y podrá incluir catálogo, detalle de producto, carrito, gestión de pedidos, base de datos y API propia (ver `documentacion/ROADMAP.md`).
+Etapa desarrollada como proyecto académico. El MVP local está completado y validado (suite automatizada 88/88 PASS y validación manual del flujo con pago aprobado; ver sección MVP LOCAL DE v1.3). Quedan pendientes posteriores (reenvío de verificación, cancelación de Pedido, estado `EN_PROCESO`) y la definición de despliegue, fuera del alcance actual (ver `documentacion/ROADMAP.md`).
 
 El e-commerce no se desplegará a PROD por ahora: no habrá ventas ni cobros reales.
 
@@ -299,7 +367,7 @@ El proyecto NO utiliza:
 - Angular;
 - Vite.
 
-La arquitectura frontend está orientada a un sitio estático, responsive y modular, con datos desacoplados de las páginas HTML.
+La arquitectura frontend está orientada a un sitio estático y responsive, con datos desacoplados de las páginas HTML. Desde v1.3 incluye la tienda (`pages/tienda.html`: catálogo, carrito, checkout y continuación de la compra).
 
 ---
 
@@ -312,6 +380,13 @@ El backend utiliza:
 - API mediante Web App;
 - sistema de emails;
 - configuración separada DEV/PROD.
+
+### Backend del e-commerce (v1.3)
+
+- PHP + MariaDB, en el repositorio separado **Incancelables E-Commerce**.
+- API REST consumida por el frontend mediante `scripts/api/tiendaClient.js`.
+- Email transaccional mediante **Resend**.
+- Convive con el backend de Apps Script: el MVP no lo reemplaza ni migra.
 
 La documentación detallada del backend y los procedimientos operativos sensibles se mantienen en documentación privada fuera del repositorio público.
 
@@ -422,25 +497,21 @@ Entre ella se encuentran los documentos privados relacionados con:
 
 # CHECKPOINT
 
-## Último checkpoint funcional confirmado
+## Último checkpoint de producción (PROD, `master`)
 
-**v1.2.1**
+**v1.2.1** — commit `ef6d7d8` — **COMPLETADO**
 
-## Commit
+## Cierre funcional local (rama `dev`, MVP v1.3)
 
-`ef6d7d8`
-
-## Estado
-
-**COMPLETADO**
+**MVP LOCAL COMPLETADO** al 10/10/2026 — HEAD `75ca293` (2026-10-09), suite automatizada 88/88 PASS y validación manual del flujo con pago aprobado. Sin despliegue.
 
 ## Próximo checkpoint
 
-**v1.3 — E-commerce e infraestructura** (en desarrollo en `dev`, proyecto académico)
+**v1.3 — cierre de la etapa** (pendientes posteriores del flujo de compra y definición de despliegue; ver `documentacion/ROADMAP.md`)
 
 ## Estado de v1.3
 
-**EN DESARROLLO**
+**MVP LOCAL COMPLETADO — ETAPA ABIERTA**
 
 ## Auditoría técnica integral
 
@@ -464,4 +535,4 @@ El objetivo de `PROJECT_STATE.md` es permitir identificar rápidamente:
 
 ---
 
-# FIN DEL CHECKPOINT v1.2.1
+# FIN DEL DOCUMENTO — CHECKPOINT v1.2.1 (PROD) · MVP LOCAL v1.3 AL 2026-10-10

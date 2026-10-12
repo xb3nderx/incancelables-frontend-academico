@@ -2,6 +2,8 @@
 
 Este archivo registra los cambios relevantes realizados en el proyecto Incancelables.
 
+> **Nota de estructura (10/10/2026):** el historial conserva su orden original de redacción, que no siempre es cronológico; cada entrada lleva su fecha y las más recientes de la etapa v1.3 se leen de más nueva a más vieja. Los bloques anteriores a v1.3 están marcados como históricos.
+
 # 2026-07-25
 
 ## Estado actual del proyecto
@@ -259,6 +261,8 @@ Se implementa la posibilidad de volver a suscribirse después de una baja.
 
 # Estado actual
 
+> **Nota histórica:** estado consolidado al cierre de la etapa v1.0 (registros de julio de 2026). Para el estado vigente ver la entrada del **2026-10-10** y `PROJECT_STATE.md`.
+
 El proyecto cuenta actualmente con:
 - BACKEND V1.0              COMPLETADO
 - FRONTEND                  COMPLETADO
@@ -279,6 +283,8 @@ El proyecto cuenta actualmente con:
 - GOOGLE ANALYTICS 4        COMPLETADO
 
 # Próximos cambios previstos
+
+> **Nota histórica:** previsiones formuladas a julio de 2026. La validación de v1.0 se completó (entrada del 2026-07-27) y las versiones v1.1 y v1.2 también quedaron cerradas (ver historial posterior).
 
 ## Versión 1.0 — Validación final
 
@@ -508,6 +514,64 @@ Estado:
 
 BACKUP Y RECUPERACIÓN — COMPLETADO
 
+# 2026-10-10
+
+## Cierre funcional local del MVP v1.3 — checkout finalizado
+
+Registro del estado del MVP local en la rama `dev` (HEAD `75ca293`). El backend del e-commerce permanece en el repositorio separado **Incancelables E-Commerce** (PHP + MariaDB). Sin despliegue a PROD: `master` continúa en v1.2.1.
+
+### Finalización del checkout — commit `75ca293` (2026-10-09)
+
+`feat: finalizar checkout con confirmacion de pedido` — 4 archivos (`pages/tienda.html`, `scripts/tienda.js`, `styles/tienda.css`, `tests/checkoutA.test.mjs`), +2111 / −13.
+
+- **Mensaje bloqueante de pedido creado:** tras el alta confirmada del Pedido, el drawer muestra un mensaje modal con el email del comprador (insertado con `textContent`, nunca `innerHTML`) y único control [OK]. Mientras el mensaje está visible la pestaña queda bloqueada (el foco se retiene dentro del diálogo): [OK] vacía el carrito de esa compra, limpia el contexto local y refresca el catálogo.
+- **Aislamiento mediante `sessionStorage`:** la marca de pedido creado se persiste en `sessionStorage` (alcance por pestaña). Ninguna otra pestaña ve esa marca ni pierde su carrito, y el flujo de la tienda no utiliza `localStorage`. Si la pestaña se recarga sin presionar [OK], el carrito del pedido ya creado no reaparece.
+- **Eliminación de `BroadcastChannel`:** la implementación experimental de sincronización entre pestañas con `BroadcastChannel` fue retirada y no existe en el código fuente (el respaldo queda fuera del repositorio). La suite verifica estáticamente su ausencia en `scripts/tienda.js` y `scripts/resultado.js` (T12).
+- **Token sin persistir:** el token de verificación de email vive sólo en memoria en `scripts/tienda.js`; la única puerta de entrada al modo de continuación es `?token=` en la URL.
+
+### Validación automatizada — 88/88 PASS
+
+Evidencia automatizada:
+
+- `node tests/checkoutA.test.mjs` → **88 pasaron, 0 fallaron** (última corrida: 2026-10-10, con los cambios de comentarios todavía sin commit).
+- La suite incluye aserciones estáticas sobre el fuente: sin `localStorage`, sin `BroadcastChannel`, marca con `sessionStorage.setItem(CLAVE_PEDIDO_CREADO)` y presencia de `mostrarContinuarCompra`, entre otras.
+- `node --check` (sintaxis) OK para los cinco archivos JavaScript intervenidos en la ronda de comentarios.
+
+Con motivo de la actualización documental del 10/10/2026 no se volvió a ejecutar ninguna suite.
+
+### Validación manual — flujo completo con pago aprobado
+
+Evidencia manual (recorrido humano, distinta de la automatizada):
+
+- Flujo completo validado manualmente sobre el MVP local: creación del Pedido → verificación de email → recuperación en la tienda → pago con simulación `APROBADO` → confirmación de la compra con vaciado del carrito.
+- El MVP local no presenta defectos bloqueantes conocidos.
+
+### Estado de la rama `dev` al 10/10/2026
+
+- HEAD: `75ca293` — `feat: finalizar checkout con confirmacion de pedido` (push anterior confirmado por el usuario).
+- Cambios sin commit: 5 archivos JavaScript (`scripts/tienda.js`, `scripts/carrito.js`, `scripts/resultado.js`, `scripts/api/tiendaClient.js`, `scripts/api/apiConfig.js`) con **sólo comentarios** (+181 / −41); verificado que el diff no contiene ninguna línea de código. Y, en esta misma ronda, los 3 documentos de cierre (`documentacion/CHANGELOG.md`, `documentacion/ROADMAP.md`, `documentacion/PROJECT_STATE.md`).
+- Sin cambios en backend, tests, HTML, CSS ni README.
+
+### Historial Git de la etapa v1.3 (rama `dev`)
+
+| Commit | Fecha | Mensaje |
+| --- | --- | --- |
+| `7c01421` | 2026-10-01 | docs: checkpoint previo al frontend e-commerce |
+| `fff2c6f` | 2026-10-01 | Implementa catalogo inicial de tienda |
+| `ce4d1e0` | 2026-10-01 | feat: implementar carrito frontend |
+| `24f8cf8` | 2026-10-02 | feat: implementar checkout frontend |
+| `055b78b` | 2026-10-02 | docs: corregir continuidad del checkout frontend |
+| `636ff06` | 2026-10-05 | feat: integrar verificacion de email del checkout |
+| `ea58cd5` | 2026-10-06 | feat: integrar pago frontend |
+| `b9f2b2f` | 2026-10-06 | feat: continuar compra desde pedido verificado |
+| `ea3188b` | 2026-10-07 | feat: integrar compra verificada en carrito |
+| `84978de` | 2026-10-07 | fix: corregir estado del carrito en flujo de compra |
+| `75ca293` | 2026-10-09 | feat: finalizar checkout con confirmacion de pedido |
+
+### Correcciones cronológicas
+
+- Las entradas de 2026-10-06 y 2026-10-07 que informaban "trabajo sin commit" describen el estado del working tree en ese momento: el trabajo fue commiteado después (ver tabla). El texto original se conserva y cada una lleva ahora la anotación del commit correspondiente.
+
 # 2026-10-07
 
 ## Bloque 6 — continuación de la compra en el drawer (post-verificación)
@@ -515,6 +579,8 @@ BACKUP Y RECUPERACIÓN — COMPLETADO
 Se retira la sección provisional **Tu compra** (`#compra`) y todo el flujo posterior a la verificación del email pasa a vivir en el **drawer del carrito** que ya existe en `pages/tienda.html`: recuperación del Pedido por token, edición de items, reemplazo del Pedido, pago, correcciones y reintentos comparten el mismo panel, el mismo carrito y el mismo CTA.
 
 Sin cambios en el backend (cerrado en `1f3d37a`) ni en `scripts/api/apiConfig.js`. No se despliega a PROD. Trabajo realizado en el working tree, sin commit.
+
+> **Commiteado después:** este trabajo quedó registrado en `ea3188b` (2026-10-07), con una corrección posterior del estado del carrito en `84978de` (2026-10-07).
 
 ### Flujo
 
@@ -576,6 +642,8 @@ Se rehace el flujo posterior a la verificación del email para que la compra **n
 
 Reutiliza la orquestación de pago implementada en el Bloque 5 (`ea58cd5`): sólo se mudó de `resultado.js` a `tienda.js`. Sin cambios en el backend ni en `scripts/api/apiConfig.js`. No se despliega a PROD. Trabajo realizado en el working tree, sin commit.
 
+> **Commiteado después:** este trabajo quedó registrado en `b9f2b2f` (2026-10-06).
+
 ### Flujo
 
 `resultado.html` (verificación) → **Continuar compra** → `tienda.html?token=TOKEN` → `POST /api/email-verificaciones/pedidos` → resumen de compra (Producto / Cantidad / Precio unitario / Subtotal / Total) → **Pagar** → `POST /api/pedidos/{id}/pago`
@@ -626,6 +694,8 @@ CONTINUACIÓN DE COMPRA Y PAGO DESDE LA TIENDA — IMPLEMENTADO
 Se implementa el Bloque 5 (pago) del frontend de la Tienda en la rama `dev`, dentro de la etapa v1.3 — E-commerce (proyecto académico), cerrando el flujo `Email verificado → Continuar al pago → APROBADO/RECHAZADO → resultado`.
 
 Sin cambios en el backend ni en `scripts/api/apiConfig.js`. No se despliega a PROD. Trabajo realizado en el working tree, sin commit.
+
+> **Commiteado después:** este trabajo quedó registrado en `ea58cd5` (2026-10-06).
 
 ### Cliente de pago
 
@@ -815,6 +885,8 @@ El visor mantiene:
 - Transformaciones controladas mediante `translate()` + `scale()`.
 
 ## Estado actual de la versión 1.1
+
+> **Nota histórica:** este estado corresponde a agosto de 2026. El visor se completó después en v1.2 y v1.2.1 (ambas cerradas y validadas).
 
 ### Galerías históricas
 
