@@ -15,7 +15,7 @@ const TIENDA_API = {
 
     // Virtual Host local (XAMPP)
     URL_DEV:
-        "http://incancelables-ecommerce.local/api",
+        "https://incancelables-ecommerce-academico-production.up.railway.app/api",
 
     // Aún no existe PROD para el e-commerce académico.
     URL_PROD: null,
