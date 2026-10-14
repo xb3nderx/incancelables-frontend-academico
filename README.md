@@ -117,7 +117,7 @@ La arquitectura fue diseñada para admitir un comercio electrónico extensible, 
    git clone https://github.com/xb3nderx/incancelables-frontend-academico.git
    ```
 
-2. Configurar la URL del backend del e-commerce utilizada por el cliente HTTP de Tienda (`scripts/api/tiendaClient.js`) para que apunte al servidor local, si se ejecutará el frontend fuera del despliegue académico.
+2. Configurar la URL del backend del e-commerce en **`scripts/api/tiendaConfig.js`** para que apunte al servidor local, si se ejecutará el frontend fuera del despliegue académico.
 3. Servir el frontend mediante HTTP y abrir **`pages/tienda.html`**. No se recomienda abrir la página directamente mediante `file://`.
 4. Comprobar que el backend permita el origen HTTP desde el cual se está sirviendo el frontend (configuración CORS).
 
@@ -140,7 +140,7 @@ La API utiliza el prefijo **`/api`** y comunica sus resultados mediante JSON. La
 | `POST` | `/api/email-verificaciones/pedidos` | Recuperar pedidos asociados a una verificación autorizada. |
 | `POST` | `/api/email-verificaciones/pedidos/reemplazo` | Gestionar el reemplazo asociado al flujo de verificación de pedidos. |
 
-Los endpoints `POST` reciben cuerpos JSON con los datos requeridos por cada operación. Las rutas que actúan sobre un pedido o sobre su verificación aplican los controles de autorización mediante token previstos por el flujo.
+Los endpoints `POST` reciben cuerpos JSON con los datos requeridos por cada operación. Las operaciones protegidas utilizan los controles de autorización mediante token previstos por el flujo. El endpoint de reenvío de verificación (`/api/email-verificaciones/reenvio`) constituye una excepción: recibe el identificador del pedido, no exige un token y envía el correo únicamente a la dirección registrada, sujeto a las restricciones de reenvío implementadas.
 
 ### Ejemplo de consulta
 
@@ -259,7 +259,9 @@ incancelables-ecommerce-academico/
 │   ├── config/             # Configuración
 │   ├── controllers/        # Adaptación HTTP
 │   ├── services/           # Reglas de negocio
-│   ├── database/           # Acceso y repositorios de datos
+│   ├── repositories/       # Acceso y persistencia mediante PDO
+│   ├── models/             # Modelos del dominio
+│   ├── payments/           # Proveedor de pago simulado
 │   └── mail/               # Transporte de email
 ├── sql/
 │   └── incancelables_ecommerce.sql
